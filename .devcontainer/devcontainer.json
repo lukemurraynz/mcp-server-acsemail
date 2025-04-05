@@ -3,7 +3,11 @@
   "build": {
     "dockerfile": "dockerfile"
   },
+
   "customizations": {
+    "features": {
+      "ghcr.io/devcontainers/features/node:1": {}
+  },
     "vscode": {
       "settings": {
         "editor.formatOnSaveMode": "file"
