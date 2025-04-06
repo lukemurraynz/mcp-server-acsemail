@@ -1,14 +1,10 @@
 {
-    "mcp": {
-      "servers": {
-        "github": {
-          "command": "python",
-          "args": [
-            "run",
-            "-i",
-            "src/server.py "
-          ],
+    "servers": {
+        "email": {
+            "command": "python",
+            "args": [
+                "/workspaces/mcp-server-acsemail/src/server.py",
+            ]
         }
-      }
     }
-  }
+}
