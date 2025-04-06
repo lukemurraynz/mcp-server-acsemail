@@ -54,7 +54,7 @@ mcp = FastMCP("Email Sender")
 
 # DEFINE TOOLS
 
-@mcp.tool(name="f1e_send_email")  
+@mcp.tool(name="send_email")  
 def send_email(recipient: str, subject: str, content: str) -> str:
     """Send all emails using Azure Communication Services
     
