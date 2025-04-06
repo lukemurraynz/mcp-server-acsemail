@@ -277,11 +277,116 @@ def create_bulk_email_message(recipients: list, subject: str, content: str) -> D
 
 # DEFINE RESOURCES
 
-@mcp.resource("greeting://{name}")
-def get_greeting(name: str) -> str:
-    """Get a personalized greeting"""
-    return f"Hello, {name}!"
+@mcp.resource("acs-email://config")
+def get_email_config() -> Dict[str, Any]:
+    """Get the current email configuration information
     
+    Returns information about the current Azure Communication Services email configuration
+    """
+    return {
+        "sender_address": ACS_SENDER_ADDRESS,
+        "is_configured": validate_config(),
+        "status": "active" if validate_config() else "not configured"
+    }
+
+@mcp.resource("acs-email://docs/html")
+def get_html_email_template() -> str:
+    """Get a sample HTML email template
+    
+    Returns a sample HTML template that can be used with the email sending tools
+    """
+    return """<!DOCTYPE html>
+<html>
+<head>
+    <style>
+        body { font-family: Arial, sans-serif; line-height: 1.6; }
+        .container { max-width: 600px; margin: 0 auto; padding: 20px; }
+        .header { background-color: #f5f5f5; padding: 10px; text-align: center; }
+        .content { padding: 20px; }
+        .footer { font-size: 12px; text-align: center; color: #777; margin-top: 20px; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>{{title}}</h1>
+        </div>
+        <div class="content">
+            <p>Hello {{recipient_name}},</p>
+            <p>{{message_body}}</p>
+            <p>Regards,<br>{{sender_name}}</p>
+        </div>
+        <div class="footer">
+            <p>This email was sent via Azure Communication Services</p>
+        </div>
+    </div>
+</body>
+</html>"""
+
+@mcp.resource("acs-email://formats")
+def get_supported_formats() -> Dict[str, Any]:
+    """Get information about supported email formats and content types
+    
+    Returns details about the formats and content types supported by the email tools
+    """
+    return {
+        "content_types": ["text/plain", "text/html"],
+        "attachment_size_limit": "10MB per attachment",
+        "supported_attachment_types": [
+            "application/pdf", "application/msword", 
+            "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+            "image/jpeg", "image/png", "text/plain", "text/csv"
+        ],
+        "best_practices": [
+            "Use HTML formatting for rich content emails",
+            "Keep attachment sizes reasonable",
+            "Validate email addresses before sending",
+            "Use bulk email for multiple recipients",
+            "Include clear subject lines"
+        ]
+    }
+
+@mcp.resource("acs-email://examples/{tool_name}")
+def get_email_examples(tool_name: str) -> Dict[str, Any]:
+    """Get example usage of the email tools
+    
+    Args:
+        tool_name: Name of the tool to get examples for ("send_email", "send_email_with_attachments", or "send_bulk_email")
+        
+    Returns:
+        Dictionary containing example parameters and usage for the specified tool
+    """
+    examples = {
+        "send_email": {
+            "example_parameters": {
+                "recipient": "user@example.com",
+                "subject": "Hello from ACS Email Sender",
+                "content": "<h1>Hello!</h1><p>This is a test email.</p>"
+            },
+            "usage": "This tool is used to send a simple email to a single recipient."
+        },
+        "send_email_with_attachments": {
+            "example_parameters": {
+                "recipient": "user@example.com",
+                "subject": "Document Attached",
+                "content": "<p>Please find the requested document attached.</p>",
+                "attachments": ["/path/to/document.pdf", "/path/to/image.jpg"]
+            },
+            "usage": "This tool is used to send an email with file attachments to a single recipient."
+        },
+        "send_bulk_email": {
+            "example_parameters": {
+                "recipients": ["user1@example.com", "user2@example.com", "user3@example.com"],
+                "subject": "Important Announcement",
+                "content": "<h2>Team Update</h2><p>This is an important announcement for all team members.</p>"
+            },
+            "usage": "This tool is used to send the same email to multiple recipients at once."
+        }
+    }
+    
+    return examples.get(tool_name, {"error": "Unknown tool name"})
+
+
 # execute and return the stdio output
 if __name__ == "__main__":
     # Validate configuration at startup
