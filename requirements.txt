@@ -1,3 +1,4 @@
 uv
-mcp[cli]
+mcp
 azure-communication-email
+python-dotenv
