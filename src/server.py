@@ -125,6 +125,156 @@ def process_email_result(result: Any, recipient: str) -> str:
         logger.info(f"Email sent successfully to {recipient}.")
         return f"Email sent to {recipient} successfully!"
 
+@mcp.tool(name="send_email_with_attachments")
+def send_email_with_attachments(recipient: str, subject: str, content: str, attachments: list) -> str:
+    """Send email with file attachments using Azure Communication Services
+    
+    Args:
+        recipient: Email address of the recipient
+        subject: Subject line of the email
+        content: HTML content of the email
+        attachments: List of file paths to attach
+        
+    Returns:
+        A message indicating the status of the email sending operation
+    """
+    logger.info(f"Starting email sending process with attachments to: {recipient}")
+    
+    # Validate configuration
+    if not validate_config():
+        return "Error: Email service is not configured properly. Check your .env file."
+    
+    # Get email client
+    email_client = get_email_client()
+    if not email_client:
+        return "Error: Unable to initialize email client"
+    
+    try:
+        # Create the email message with attachments
+        logger.info(f"Creating email message with subject: {subject} and {len(attachments)} attachments")
+        message = create_email_message_with_attachments(recipient, subject, content, attachments)
+        
+        # Send the email
+        logger.info(f"Beginning email send operation with attachments")
+        poller = email_client.begin_send(message)
+        logger.info(f"Email send operation initiated, waiting for result")
+        result = poller.result()
+        
+        return process_email_result(result, recipient)
+    except Exception as e:
+        logger.error(f"Failed to send email with attachments: {str(e)}", exc_info=True)
+        return f"Failed to send email with attachments: {str(e)}"
+
+def create_email_message_with_attachments(recipient: str, subject: str, content: str, attachments: list) -> Dict[str, Any]:
+    """Create an email message with attachments for Azure Communication Services"""
+    import base64
+    
+    message = {
+        "content": {
+            "subject": subject,
+            "plainText": content,
+            "html": content
+        },
+        "recipients": {
+            "to": [
+                {
+                    "address": recipient,
+                    "displayName": "Email Recipient"
+                }
+            ]
+        },
+        "senderAddress": ACS_SENDER_ADDRESS,
+        "attachments": []
+    }
+    
+    for file_path in attachments:
+        try:
+            with open(file_path, "rb") as file:
+                file_content = file.read()
+                filename = os.path.basename(file_path)
+                
+                # Base64 encode the file content
+                encoded_content = base64.b64encode(file_content).decode('utf-8')
+                
+                # Add attachment to message
+                message["attachments"].append({
+                    "name": filename,
+                    "contentType": "application/octet-stream",
+                    "contentInBase64": encoded_content
+                })
+                
+                logger.info(f"Added attachment: {filename}")
+        except Exception as e:
+            logger.warning(f"Failed to add attachment {file_path}: {str(e)}")
+    
+    return message
+
+@mcp.tool(name="send_bulk_email")
+def send_bulk_email(recipients: list, subject: str, content: str) -> str:
+    """Send email to multiple recipients using Azure Communication Services
+    
+    Args:
+        recipients: List of email addresses to send to
+        subject: Subject line of the email
+        content: HTML content of the email
+        
+    Returns:
+        A message indicating the status of the email sending operation
+    """
+    logger.info(f"Starting bulk email sending process to {len(recipients)} recipients")
+    
+    # Validate configuration
+    if not validate_config():
+        return "Error: Email service is not configured properly. Check your .env file."
+    
+    # Get email client
+    email_client = get_email_client()
+    if not email_client:
+        return "Error: Unable to initialize email client"
+    
+    success_count = 0
+    failed_recipients = []
+    
+    try:
+        # Create the email message for multiple recipients
+        logger.info(f"Creating bulk email message with subject: {subject}")
+        message = create_bulk_email_message(recipients, subject, content)
+        
+        # Send the email
+        logger.info(f"Beginning bulk email send operation")
+        poller = email_client.begin_send(message)
+        logger.info(f"Bulk email send operation initiated, waiting for result")
+        result = poller.result()
+        
+        success_count = len(recipients)
+        return f"Bulk email sent successfully to {success_count} recipients!"
+    except Exception as e:
+        logger.error(f"Failed to send bulk email: {str(e)}", exc_info=True)
+        return f"Failed to send bulk email: {str(e)}"
+
+def create_bulk_email_message(recipients: list, subject: str, content: str) -> Dict[str, Any]:
+    """Create an email message for multiple recipients using Azure Communication Services"""
+    to_list = []
+    for recipient in recipients:
+        to_list.append({
+            "address": recipient,
+            "displayName": "Email Recipient"
+        })
+    
+    return {
+        "content": {
+            "subject": subject,
+            "plainText": content,
+            "html": content
+        },
+        "recipients": {
+            "to": to_list
+        },
+        "senderAddress": ACS_SENDER_ADDRESS
+    }
+
+
+
 # DEFINE RESOURCES
 
 @mcp.resource("greeting://{name}")
