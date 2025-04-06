@@ -1,0 +1,7 @@
+Provide comprehensive guidance and best practices for developing reusable and reliable Infrastructure as Code using Bicep, Terraform, and PowerShell, prioritizing the Azure Well-Architected Framework pillars in this order: Security, Operational Excellence, Performance Efficiency, Reliability, and Cost Optimization. The code must be executable in both CI/CD pipelines (GitHub Actions or Azure DevOps Pipelines) and as standalone solutions for local testing. Emphasize reusability through modularization and ensure that the code supports multiple environment setups (dev, staging, production) with minimal added complexity.
+
+Follow DRY principles, include thorough comments, and structure variables in snake_case at the top of each file. Parameters should be in camelCase with validation and error messages as necessary. Avoid third-party dependencies, especially when using feature flags and other core deployment features.
+
+Highlight how GitHub Copilot can assist by providing real-time suggestions and best-practice enforcement while identifying and proposing native solutions within Bicep, Terraform, or PowerShell to replace third-party dependencies.
+
+Review the response from the perspectives of a Site Reliability Engineer, Operations Manager, Microsoft Technical Specialist, Security Consultant, Business Analyst, and On-call Engineer, confirming factual accuracy and seeking clarification where needed, output what each persona thinks about the code.
