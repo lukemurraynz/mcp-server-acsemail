@@ -85,6 +85,13 @@ def tan(a: int) -> float:
     """tan of a number"""
     return float(math.tan(a))
 
+@mcp.tool()
+def calculate_bmi(weight_kg: float, height_m: float) -> float:
+    """Calculate BMI given weight in kg and height in meters"""
+    return weight_kg / (height_m**2)
+
+
+
 # DEFINE RESOURCES
 
 # Add a dynamic greeting resource
