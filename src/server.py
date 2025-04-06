@@ -1,27 +1,62 @@
 # basic import 
 from mcp.server.fastmcp import FastMCP
-import math
+import logging
 from azure.communication.email import EmailClient
 import os
 from dotenv import load_dotenv
-import uuid
+from typing import Dict, Any, Optional
+
+# Configure logging
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
+)
+logger = logging.getLogger("acs-email-sender")
 
 # Load environment variables
 load_dotenv()
-
-# instantiate an MCP server client
-mcp = FastMCP("Hello World")
-
-# DEFINE TOOLS
 
 # Azure Communication Services configuration
 ACS_CONNECTION_STRING = os.getenv("ACS_CONNECTION_STRING")
 ACS_SENDER_ADDRESS = os.getenv("ACS_SENDER_ADDRESS")
 
-# Email tool
-@mcp.tool()
+# Validation at startup
+def validate_config() -> bool:
+    """Validate the required configuration is present"""
+    if not ACS_CONNECTION_STRING or ACS_CONNECTION_STRING == "your_acs_connection_string_here":
+        logger.error(f"ACS_CONNECTION_STRING is not configured properly")
+        return False
+    
+    if not ACS_SENDER_ADDRESS or ACS_SENDER_ADDRESS == "DoNotReply@your-domain.azurecomm.net":
+        logger.error(f"ACS_SENDER_ADDRESS is not configured properly")
+        return False
+    
+    logger.info(f"Email configuration validated. Sender: {ACS_SENDER_ADDRESS}")
+    return True
+
+# Cache the email client to avoid recreating it for each request
+_email_client: Optional[EmailClient] = None
+
+def get_email_client() -> Optional[EmailClient]:
+    """Get or create an EmailClient instance"""
+    global _email_client
+    if _email_client is None:
+        try:
+            _email_client = EmailClient.from_connection_string(ACS_CONNECTION_STRING)
+            logger.info("Email Client initialized successfully")
+        except Exception as e:
+            logger.error(f"Failed to initialize Email Client: {str(e)}")
+            return None
+    return _email_client
+
+# instantiate an MCP server client
+mcp = FastMCP("Email Sender")
+
+# DEFINE TOOLS
+
+@mcp.tool(name="f1e_send_email")  
 def send_email(recipient: str, subject: str, content: str) -> str:
-    """Send an email using Azure Communication Services
+    """Send all emails using Azure Communication Services
     
     Args:
         recipient: Email address of the recipient
@@ -31,167 +66,77 @@ def send_email(recipient: str, subject: str, content: str) -> str:
     Returns:
         A message indicating the status of the email sending operation
     """
-    print(f"[INFO] Starting email sending process to: {recipient}")
+    logger.info(f"Starting email sending process to: {recipient}")
     
-    if not ACS_CONNECTION_STRING or ACS_CONNECTION_STRING == "your_acs_connection_string_here":
-        print(f"[ERROR] ACS_CONNECTION_STRING is not configured properly: {ACS_CONNECTION_STRING}")
-        return "Error: ACS_CONNECTION_STRING is not configured properly. Check your .env file."
+    # Validate configuration
+    if not validate_config():
+        return "Error: Email service is not configured properly. Check your .env file."
     
-    if not ACS_SENDER_ADDRESS or ACS_SENDER_ADDRESS == "DoNotReply@your-domain.azurecomm.net":
-        print(f"[ERROR] ACS_SENDER_ADDRESS is not configured properly: {ACS_SENDER_ADDRESS}")
-        return "Error: ACS_SENDER_ADDRESS is not configured properly. Check your .env file."
-    
-    print(f"[INFO] Email configuration validated. Sender: {ACS_SENDER_ADDRESS}")
+    # Get email client
+    email_client = get_email_client()
+    if not email_client:
+        return "Error: Unable to initialize email client"
     
     try:
-        # Initialize the Email Client
-        print(f"[INFO] Initializing Email Client with connection string")
-        email_client = EmailClient.from_connection_string(ACS_CONNECTION_STRING)
-        print(f"[INFO] Email Client initialized successfully")
-       
-        # Create the email content
-        print(f"[INFO] Creating email message with subject: {subject}")
-        message = {
-            "content": {
-                "subject": subject,
-                "plainText": content,
-                "html": content
-            },
-            "recipients": {
-                "to": [
-                    {
-                        "address": recipient,
-                        "displayName": "Email Recipient"
-                    }
-                ]
-            },
-            "senderAddress": ACS_SENDER_ADDRESS
-        }
-        print(f"[INFO] Email message created successfully")
+        # Create the email message
+        logger.info(f"Creating email message with subject: {subject}")
+        message = create_email_message(recipient, subject, content)
         
         # Send the email
-        print(f"[INFO] Beginning email send operation")
+        logger.info(f"Beginning email send operation")
         poller = email_client.begin_send(message)
-        print(f"[INFO] Email send operation initiated, waiting for result")
+        logger.info(f"Email send operation initiated, waiting for result")
         result = poller.result()
         
-        # Debug - inspect result structure
-        print(f"[DEBUG] Result type: {type(result)}")
-        print(f"[DEBUG] Result content: {result}")
-        print(f"[DEBUG] Result dir: {dir(result)}")
-        
-        # Handle result as dictionary if that's what's returned
-        if isinstance(result, dict) and 'id' in result:
-            message_id = result.get('id', 'unknown')
-            print(f"[SUCCESS] Email sent successfully to {recipient}. Message ID: {message_id}")
-            return f"Email sent to {recipient} successfully! Message ID: {message_id}"
-        # Handle result as object with message_id attribute
-        elif hasattr(result, 'message_id'):
-            print(f"[SUCCESS] Email sent successfully to {recipient}. Message ID: {result.message_id}")
-            return f"Email sent to {recipient} successfully! Message ID: {result.message_id}"
-        # Handle any other type of successful result
-        else:
-            print(f"[SUCCESS] Email sent successfully to {recipient}.")
-            return f"Email sent to {recipient} successfully!"
+        return process_email_result(result, recipient)
     except Exception as e:
-        print(f"[ERROR] Failed to send email: {str(e)}")
-        print(f"[ERROR] Exception type: {type(e).__name__}")
+        logger.error(f"Failed to send email: {str(e)}", exc_info=True)
         return f"Failed to send email: {str(e)}"
 
-#addition tool
-@mcp.tool()
-def add(a: int, b: int) -> int:
-    """Add two numbers"""
-    return int(a + b)
+def create_email_message(recipient: str, subject: str, content: str) -> Dict[str, Any]:
+    """Create an email message for Azure Communication Services"""
+    return {
+        "content": {
+            "subject": subject,
+            "plainText": content,
+            "html": content
+        },
+        "recipients": {
+            "to": [
+                {
+                    "address": recipient,
+                    "displayName": "Email Recipient"
+                }
+            ]
+        },
+        "senderAddress": ACS_SENDER_ADDRESS
+    }
 
-# subtraction tool
-@mcp.tool()
-def subtract(a: int, b: int) -> int:
-    """Subtract two numbers"""
-    return int(a - b)
-
-# multiplication tool
-@mcp.tool()
-def multiply(a: int, b: int) -> int:
-    """Multiply two numbers"""
-    return int(a * b)
-
-#  division tool
-@mcp.tool() 
-def divide(a: int, b: int) -> float:
-    """Divide two numbers"""
-    return float(a / b)
-
-# power tool
-@mcp.tool()
-def power(a: int, b: int) -> int:
-    """Power of two numbers"""
-    return int(a ** b)
-
-# square root tool
-@mcp.tool()
-def sqrt(a: int) -> float:
-    """Square root of a number"""
-    return float(a ** 0.5)
-
-# cube root tool
-@mcp.tool()
-def cbrt(a: int) -> float:
-    """Cube root of a number"""
-    return float(a ** (1/3))
-
-# factorial tool
-@mcp.tool()
-def factorial(a: int) -> int:
-    """factorial of a number"""
-    return int(math.factorial(a))
-
-# log tool
-@mcp.tool()
-def log(a: int) -> float:
-    """log of a number"""
-    return float(math.log(a))
-
-# remainder tool
-@mcp.tool()
-def remainder(a: int, b: int) -> int:
-    """remainder of two numbers divison"""
-    return int(a % b)
-
-# sin tool
-@mcp.tool()
-def sin(a: int) -> float:
-    """sin of a number"""
-    return float(math.sin(a))
-
-# cos tool
-@mcp.tool()
-def cos(a: int) -> float:
-    """cos of a number"""
-    return float(math.cos(a))
-
-# tan tool
-@mcp.tool()
-def tan(a: int) -> float:
-    """tan of a number"""
-    return float(math.tan(a))
-
-@mcp.tool()
-def calculate_bmi(weight_kg: float, height_m: float) -> float:
-    """Calculate BMI given weight in kg and height in meters"""
-    return weight_kg / (height_m**2)
-
-
+def process_email_result(result: Any, recipient: str) -> str:
+    """Process the result from an email send operation"""
+    if isinstance(result, dict) and 'id' in result:
+        message_id = result.get('id', 'unknown')
+        logger.info(f"Email sent successfully to {recipient}. Message ID: {message_id}")
+        return f"Email sent to {recipient} successfully! Message ID: {message_id}"
+    elif hasattr(result, 'message_id'):
+        logger.info(f"Email sent successfully to {recipient}. Message ID: {result.message_id}")
+        return f"Email sent to {recipient} successfully! Message ID: {result.message_id}"
+    else:
+        logger.info(f"Email sent successfully to {recipient}.")
+        return f"Email sent to {recipient} successfully!"
 
 # DEFINE RESOURCES
 
-# Add a dynamic greeting resource
 @mcp.resource("greeting://{name}")
 def get_greeting(name: str) -> str:
     """Get a personalized greeting"""
     return f"Hello, {name}!"
     
- 
- # execute and return the stdio output
+# execute and return the stdio output
 if __name__ == "__main__":
+    # Validate configuration at startup
+    if not validate_config():
+        logger.warning("Starting with invalid configuration - email sending will fail")
+    
+    logger.info("Starting MCP server for ACS Email Sender")
     mcp.run(transport="stdio")
