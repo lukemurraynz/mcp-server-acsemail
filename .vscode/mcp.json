@@ -1,0 +1,14 @@
+{
+    "mcp": {
+      "servers": {
+        "github": {
+          "command": "python",
+          "args": [
+            "run",
+            "-i",
+            "src/server.py "
+          ],
+        }
+      }
+    }
+  }
