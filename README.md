@@ -2,6 +2,8 @@
 
 This is a Model Context Protocol (MCP) server with Azure Communication Services email functionality. It allows you to send emails programmatically and perform various operations.
 
+Blog: [Sending Emails with MCP and Azure Communication Services](https://luke.geek.nz/azure/mcp-acs-email-integration/)
+
 ## Prerequisites
 
 - Python 3.8 or higher
